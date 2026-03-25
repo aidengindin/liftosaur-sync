@@ -9,8 +9,25 @@ import { IntervalsClient } from "./intervals.js";
 import { StravaClient } from "./strava.js";
 import { SyncDatabase } from "./db.js";
 import { syncWorkouts, SyncDestinations } from "./sync.js";
+import { parseSince } from "./utils.js";
 
 const fullSync = process.argv.includes("--full");
+
+const sinceIdx = process.argv.indexOf("--since");
+let sinceDate: string | undefined;
+if (sinceIdx !== -1) {
+  const sinceArg = process.argv[sinceIdx + 1];
+  if (!sinceArg) {
+    console.error("--since requires a value (e.g. --since 7d or --since 2026-03-18)");
+    process.exit(1);
+  }
+  try {
+    sinceDate = parseSince(sinceArg);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+}
 
 const liftosaur = new LiftosaurClient(config.liftosaur.apiKey);
 const db = new SyncDatabase(config.db.path);
@@ -46,11 +63,10 @@ if (Object.keys(destinations).length === 0) {
   process.exit(1);
 }
 
-console.log(
-  `Starting ${fullSync ? "full" : "incremental"} sync to: ${Object.keys(destinations).join(", ")}…`
-);
+const syncLabel = fullSync ? "full" : sinceDate ? `since ${sinceDate}` : "incremental";
+console.log(`Starting ${syncLabel} sync to: ${Object.keys(destinations).join(", ")}…`);
 
-syncWorkouts(liftosaur, destinations, db, { fullSync })
+syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone })
   .then((result) => {
     console.log(
       `\nDone — synced: ${result.synced}, skipped: ${result.skipped}, errors: ${result.errors.length}`

@@ -16,10 +16,11 @@
           pname = "liftosaur-sync";
           version = "1.0.0";
           src = ./.;
+          inherit nodejs;
 
           # Run `nix build` once with this set to lib.fakeHash, then replace it
           # with the hash printed in the error message.
-          npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          npmDepsHash = "sha256-9Zkxa5HEPtYG0+WkV+L90JP14HvPQzVdN8ctKkrGHSY=";
 
           # better-sqlite3 compiles a native .node binding via node-gyp
           nativeBuildInputs = with pkgs; [

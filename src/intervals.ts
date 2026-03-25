@@ -1,16 +1,23 @@
-export interface IntervalsEvent {
-  /** ISO date-time string in local time, e.g. "2026-03-01T10:00:00" */
+export interface IntervalsActivity {
   start_date_local: string;
   name: string;
+  type: string;
+  moving_time?: number;
+  elapsed_time?: number;
   description?: string;
-  /** Activity type — use "WeightTraining" for strength workouts */
-  type?: string;
-  category?: string;
-  moving_time?: number; // seconds
-  /** Arbitrary key used to identify the source record and prevent duplicates */
-  uid?: string;
+  kg_lifted?: number;
+  external_id?: string;
 }
 
+export interface IntervalsCreatedActivity {
+  id: number;
+  external_id?: string;
+  name: string;
+  start_date_local: string;
+  type: string;
+}
+
+// Keep for backwards compatibility (used by getEvents)
 export interface IntervalsCreatedEvent {
   id: number;
   uid?: string;
@@ -27,30 +34,27 @@ export class IntervalsClient {
     private readonly athleteId: string,
     apiKey: string
   ) {
-    // Intervals.icu uses HTTP Basic auth: username=API_KEY, password=<key>
     this.authHeader =
       "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64");
   }
 
-  async createEvent(event: IntervalsEvent): Promise<IntervalsCreatedEvent> {
-    const url = `${this.baseUrl}/athlete/${this.athleteId}/events`;
+  async createActivity(activity: IntervalsActivity): Promise<IntervalsCreatedActivity> {
+    const url = `${this.baseUrl}/athlete/${this.athleteId}/activities/manual`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: this.authHeader,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(event),
+      body: JSON.stringify(activity),
     });
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(
-        `Intervals.icu API error ${response.status}: ${body}`
-      );
+      throw new Error(`Intervals.icu API error ${response.status}: ${body}`);
     }
 
-    return response.json() as Promise<IntervalsCreatedEvent>;
+    return response.json() as Promise<IntervalsCreatedActivity>;
   }
 
   async getEvents(startDate: string, endDate: string): Promise<IntervalsCreatedEvent[]> {
@@ -62,9 +66,7 @@ export class IntervalsClient {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(
-        `Intervals.icu API error ${response.status}: ${body}`
-      );
+      throw new Error(`Intervals.icu API error ${response.status}: ${body}`);
     }
 
     return response.json() as Promise<IntervalsCreatedEvent[]>;
