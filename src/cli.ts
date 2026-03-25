@@ -6,21 +6,51 @@
 import { config } from "./config.js";
 import { LiftosaurClient } from "./liftosaur.js";
 import { IntervalsClient } from "./intervals.js";
+import { StravaClient } from "./strava.js";
 import { SyncDatabase } from "./db.js";
-import { syncWorkouts } from "./sync.js";
+import { syncWorkouts, SyncDestinations } from "./sync.js";
 
 const fullSync = process.argv.includes("--full");
 
 const liftosaur = new LiftosaurClient(config.liftosaur.apiKey);
-const intervals = new IntervalsClient(
-  config.intervals.athleteId,
-  config.intervals.apiKey
-);
 const db = new SyncDatabase(config.db.path);
 
-console.log(`Starting ${fullSync ? "full" : "incremental"} sync…`);
+const destinations: SyncDestinations = {};
 
-syncWorkouts(liftosaur, intervals, db, { fullSync })
+if (config.intervals.enabled) {
+  destinations.intervals = new IntervalsClient(
+    config.intervals.athleteId,
+    config.intervals.apiKey
+  );
+}
+
+if (config.strava.enabled) {
+  const tokens = db.getStravaTokens();
+  if (tokens) {
+    destinations.strava = new StravaClient(
+      config.strava.clientId,
+      config.strava.clientSecret,
+      tokens,
+      (refreshed) => db.saveStravaTokens(refreshed)
+    );
+  } else {
+    console.warn(
+      "Strava is configured but not yet authorized. Start the server and visit /auth/strava to connect."
+    );
+  }
+}
+
+if (Object.keys(destinations).length === 0) {
+  console.error("No sync destinations configured or authorized. Check your .env file.");
+  db.close();
+  process.exit(1);
+}
+
+console.log(
+  `Starting ${fullSync ? "full" : "incremental"} sync to: ${Object.keys(destinations).join(", ")}…`
+);
+
+syncWorkouts(liftosaur, destinations, db, { fullSync })
   .then((result) => {
     console.log(
       `\nDone — synced: ${result.synced}, skipped: ${result.skipped}, errors: ${result.errors.length}`
