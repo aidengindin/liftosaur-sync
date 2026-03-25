@@ -1,6 +1,6 @@
-import { LiftosaurClient, LiftosaurHistoryRecord, LiftosaurSet } from "./liftosaur.js";
+import { LiftosaurClient, LiftosaurHistoryRecord } from "./liftosaur.js";
 import { IntervalsClient, IntervalsActivity } from "./intervals.js";
-import { StravaClient, StravaCreateActivityParams } from "./strava.js";
+import { StravaClient, StravaConflictError, StravaCreateActivityParams } from "./strava.js";
 import { SyncDatabase } from "./db.js";
 import { toLocalDatetime, calculateKgLifted } from "./utils.js";
 
@@ -14,25 +14,6 @@ export interface SyncResult {
 // Shared formatting helpers
 // ---------------------------------------------------------------------------
 
-function formatSets(sets: LiftosaurSet[]): string {
-  const groups: { reps: number; weight: number; unit: string; count: number }[] = [];
-  for (const s of sets) {
-    const last = groups[groups.length - 1];
-    if (last && last.reps === s.reps && last.weight === s.weight && last.unit === s.unit) {
-      last.count++;
-    } else {
-      groups.push({ reps: s.reps, weight: s.weight, unit: s.unit, count: 1 });
-    }
-  }
-  return groups
-    .map((g) =>
-      g.weight > 0
-        ? `${g.count}×${g.reps} @ ${g.weight}${g.unit}`
-        : `${g.count}×${g.reps} (bodyweight)`
-    )
-    .join(", ");
-}
-
 function buildDescription(record: LiftosaurHistoryRecord): string {
   const lines: string[] = [];
 
@@ -41,20 +22,7 @@ function buildDescription(record: LiftosaurHistoryRecord): string {
     lines.push(`Week ${record.week}, Day ${record.dayInWeek}`);
   }
 
-  if (record.exercises.length > 0) {
-    lines.push("");
-    lines.push("Exercises:");
-    for (const ex of record.exercises) {
-      const name = ex.equipment ? `${ex.name} (${ex.equipment})` : ex.name;
-      const workSets = ex.sets.filter((s) => !s.isWarmup);
-      const warmupSets = ex.sets.filter((s) => s.isWarmup);
-
-      const parts: string[] = [name];
-      if (workSets.length > 0) parts.push(formatSets(workSets));
-      if (warmupSets.length > 0) parts.push(`warmup: ${formatSets(warmupSets)}`);
-      lines.push(`  • ${parts.join(" — ")}`);
-    }
-  } else if (record.exercisesText) {
+  if (record.exercisesText) {
     lines.push("");
     lines.push("Exercises:");
     const exerciseLines = record.exercisesText.split("\n").filter((l) => l.trim());
@@ -112,8 +80,17 @@ async function syncToStrava(
     description: buildDescription(record),
   };
 
-  const created = await client.createActivity(params);
-  db.markSynced(record.id, "strava", String(created.id));
+  try {
+    const created = await client.createActivity(params);
+    db.markSynced(record.id, "strava", String(created.id));
+  } catch (err) {
+    if (err instanceof StravaConflictError) {
+      console.log(`  ⚠ Activity already exists in Strava, marking as synced`);
+      db.markSynced(record.id, "strava", "conflict");
+      return;
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

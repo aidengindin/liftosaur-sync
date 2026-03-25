@@ -55,6 +55,12 @@ export function toLocalDatetime(isoString: string, timezone?: string): string {
  * Calculate total kg lifted from a Liftoscript exercises block.
  * Only counts work sets (not warmup or target lines).
  */
+export function formatSyncLabel(fullSync: boolean, since?: string): string {
+  if (fullSync) return "full";
+  if (since) return `since ${since}`;
+  return "incremental";
+}
+
 export function calculateKgLifted(exercisesText: string): number {
   let total = 0;
   for (const line of exercisesText.split("\n")) {
