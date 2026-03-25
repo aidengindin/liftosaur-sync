@@ -107,12 +107,17 @@ export class SyncDatabase {
       .run(timestamp);
   }
 
-  getSyncedWorkouts(): SyncRecord[] {
+  getSyncedWorkoutsCount(): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) as count FROM synced_workouts")
+      .get() as { count: number };
+    return row.count;
+  }
+
+  getRecentSyncedWorkouts(limit = 10): SyncRecord[] {
     return this.db
-      .prepare(
-        "SELECT * FROM synced_workouts ORDER BY synced_at DESC"
-      )
-      .all() as SyncRecord[];
+      .prepare("SELECT * FROM synced_workouts ORDER BY synced_at DESC LIMIT ?")
+      .all(limit) as SyncRecord[];
   }
 
   // ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import { IntervalsClient } from "./intervals.js";
 import { StravaClient } from "./strava.js";
 import { SyncDatabase } from "./db.js";
 import { syncWorkouts, SyncDestinations } from "./sync.js";
-import { parseSince } from "./utils.js";
+import { parseSince, formatSyncLabel } from "./utils.js";
 
 const fullSync = process.argv.includes("--full");
 
@@ -63,8 +63,7 @@ if (Object.keys(destinations).length === 0) {
   process.exit(1);
 }
 
-const syncLabel = fullSync ? "full" : sinceDate ? `since ${sinceDate}` : "incremental";
-console.log(`Starting ${syncLabel} sync to: ${Object.keys(destinations).join(", ")}…`);
+console.log(`Starting ${formatSyncLabel(fullSync, sinceDate)} sync to: ${Object.keys(destinations).join(", ")}…`);
 
 syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone })
   .then((result) => {

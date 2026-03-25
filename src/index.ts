@@ -5,7 +5,7 @@ import { IntervalsClient } from "./intervals.js";
 import { StravaClient } from "./strava.js";
 import { SyncDatabase } from "./db.js";
 import { syncWorkouts, SyncDestinations } from "./sync.js";
-import { parseSince } from "./utils.js";
+import { parseSince, formatSyncLabel } from "./utils.js";
 
 const app = express();
 app.use(express.json());
@@ -78,14 +78,14 @@ app.post("/sync", authenticate, async (req: Request, res: Response) => {
     }
   }
 
+  const strava = makeStravaClient();
   const destinations: SyncDestinations = {
     ...(intervals ? { intervals } : {}),
-    ...(makeStravaClient() ? { strava: makeStravaClient() } : {}),
+    ...(strava ? { strava } : {}),
   };
 
-  const syncLabel = fullSync ? "full" : sinceDate ? `since ${sinceDate}` : "incremental";
   try {
-    console.log(`Starting ${syncLabel} sync…`);
+    console.log(`Starting ${formatSyncLabel(fullSync, sinceDate)} sync…`);
     const result = await syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone });
     console.log(
       `Sync complete — synced: ${result.synced}, skipped: ${result.skipped}, errors: ${result.errors.length}`
@@ -108,12 +108,11 @@ app.post("/sync", authenticate, async (req: Request, res: Response) => {
  * Returns information about previously synced workouts.
  */
 app.get("/status", authenticate, (_req, res) => {
-  const synced = db.getSyncedWorkouts();
   const lastSyncedAt = db.getLastSyncedAt();
   res.json({
-    totalSynced: synced.length,
+    totalSynced: db.getSyncedWorkoutsCount(),
     lastSyncedAt: lastSyncedAt ?? null,
-    recentWorkouts: synced.slice(0, 10),
+    recentWorkouts: db.getRecentSyncedWorkouts(10),
   });
 });
 

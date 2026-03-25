@@ -22,6 +22,13 @@ export interface StravaCreateActivityParams {
   trainer?: boolean;
 }
 
+export class StravaConflictError extends Error {
+  constructor() {
+    super("Activity already exists in Strava");
+    this.name = "StravaConflictError";
+  }
+}
+
 export class StravaClient {
   private static readonly BASE_URL = "https://www.strava.com/api/v3";
   private static readonly TOKEN_URL = "https://www.strava.com/api/v3/oauth/token";
@@ -133,12 +140,21 @@ export class StravaClient {
       body: JSON.stringify(params),
     });
 
+    const body = await response.text();
+
+    if (response.status === 409) {
+      throw new StravaConflictError();
+    }
+
     if (!response.ok) {
-      const body = await response.text();
       throw new Error(`Strava API error ${response.status}: ${body}`);
     }
 
-    return response.json() as Promise<StravaActivity>;
+    if (!body) {
+      throw new Error(`Strava API returned empty response (status ${response.status})`);
+    }
+
+    return JSON.parse(body) as StravaActivity;
   }
 
   getTokens(): StravaTokens {

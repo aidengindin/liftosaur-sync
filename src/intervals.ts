@@ -17,14 +17,6 @@ export interface IntervalsCreatedActivity {
   type: string;
 }
 
-// Keep for backwards compatibility (used by getEvents)
-export interface IntervalsCreatedEvent {
-  id: number;
-  uid?: string;
-  name: string;
-  start_date_local: string;
-  type: string;
-}
 
 export class IntervalsClient {
   private readonly baseUrl = "https://intervals.icu/api/v1";
@@ -57,18 +49,4 @@ export class IntervalsClient {
     return response.json() as Promise<IntervalsCreatedActivity>;
   }
 
-  async getEvents(startDate: string, endDate: string): Promise<IntervalsCreatedEvent[]> {
-    const params = new URLSearchParams({ oldest: startDate, newest: endDate });
-    const url = `${this.baseUrl}/athlete/${this.athleteId}/events?${params}`;
-    const response = await fetch(url, {
-      headers: { Authorization: this.authHeader },
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Intervals.icu API error ${response.status}: ${body}`);
-    }
-
-    return response.json() as Promise<IntervalsCreatedEvent[]>;
-  }
 }
