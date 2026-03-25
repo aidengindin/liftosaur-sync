@@ -5,6 +5,7 @@ import { IntervalsClient } from "./intervals.js";
 import { StravaClient } from "./strava.js";
 import { SyncDatabase } from "./db.js";
 import { syncWorkouts, SyncDestinations } from "./sync.js";
+import { parseSince } from "./utils.js";
 
 const app = express();
 app.use(express.json());
@@ -65,14 +66,27 @@ app.get("/health", (_req, res) => {
  */
 app.post("/sync", authenticate, async (req: Request, res: Response) => {
   const fullSync = req.body?.full === true;
+
+  let sinceDate: string | undefined;
+  if (req.body?.since) {
+    try {
+      sinceDate = parseSince(String(req.body.since));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(400).json({ ok: false, error: message });
+      return;
+    }
+  }
+
   const destinations: SyncDestinations = {
     ...(intervals ? { intervals } : {}),
     ...(makeStravaClient() ? { strava: makeStravaClient() } : {}),
   };
 
+  const syncLabel = fullSync ? "full" : sinceDate ? `since ${sinceDate}` : "incremental";
   try {
-    console.log(`Starting ${fullSync ? "full" : "incremental"} sync…`);
-    const result = await syncWorkouts(liftosaur, destinations, db, { fullSync });
+    console.log(`Starting ${syncLabel} sync…`);
+    const result = await syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone });
     console.log(
       `Sync complete — synced: ${result.synced}, skipped: ${result.skipped}, errors: ${result.errors.length}`
     );

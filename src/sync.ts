@@ -1,7 +1,8 @@
 import { LiftosaurClient, LiftosaurHistoryRecord, LiftosaurSet } from "./liftosaur.js";
-import { IntervalsClient, IntervalsEvent } from "./intervals.js";
+import { IntervalsClient, IntervalsActivity } from "./intervals.js";
 import { StravaClient, StravaCreateActivityParams } from "./strava.js";
 import { SyncDatabase } from "./db.js";
+import { toLocalDatetime, calculateKgLifted } from "./utils.js";
 
 export interface SyncResult {
   synced: number;
@@ -55,8 +56,9 @@ function buildDescription(record: LiftosaurHistoryRecord): string {
     }
   } else if (record.exercisesText) {
     lines.push("");
-    lines.push("Exercises (raw):");
-    lines.push(record.exercisesText);
+    lines.push("Exercises:");
+    const exerciseLines = record.exercisesText.split("\n").filter((l) => l.trim());
+    lines.push(exerciseLines.join("\n\n"));
   }
 
   lines.push("");
@@ -71,11 +73,6 @@ function buildEventName(record: LiftosaurHistoryRecord): string {
   return parts.join(": ");
 }
 
-/** Strip timezone suffix to get a local datetime string (YYYY-MM-DDTHH:mm:ss) */
-function toLocalDatetime(isoString: string): string {
-  return isoString.replace(/Z$/, "").replace(/[+-]\d{2}:\d{2}$/, "");
-}
-
 // ---------------------------------------------------------------------------
 // Destination-specific sync functions
 // ---------------------------------------------------------------------------
@@ -83,31 +80,34 @@ function toLocalDatetime(isoString: string): string {
 async function syncToIntervals(
   record: LiftosaurHistoryRecord,
   client: IntervalsClient,
-  db: SyncDatabase
+  db: SyncDatabase,
+  timezone?: string
 ): Promise<void> {
-  const event: IntervalsEvent = {
-    start_date_local: toLocalDatetime(record.timestamp),
+  const kgLifted = record.exercisesText ? calculateKgLifted(record.exercisesText) : undefined;
+  const activity: IntervalsActivity = {
+    start_date_local: toLocalDatetime(record.timestamp, timezone),
     name: buildEventName(record),
-    description: buildDescription(record),
     type: "WeightTraining",
-    category: "WORKOUT",
-    ...(record.duration ? { moving_time: record.duration } : {}),
-    uid: `liftosaur:${record.id}`,
+    description: buildDescription(record),
+    external_id: `liftosaur:${record.id}`,
+    ...(record.duration ? { moving_time: record.duration, elapsed_time: record.duration } : {}),
+    ...(kgLifted ? { kg_lifted: kgLifted } : {}),
   };
 
-  const created = await client.createEvent(event);
+  const created = await client.createActivity(activity);
   db.markSynced(record.id, "intervals", String(created.id));
 }
 
 async function syncToStrava(
   record: LiftosaurHistoryRecord,
   client: StravaClient,
-  db: SyncDatabase
+  db: SyncDatabase,
+  timezone?: string
 ): Promise<void> {
   const params: StravaCreateActivityParams = {
     name: buildEventName(record),
     sport_type: "WeightTraining",
-    start_date_local: toLocalDatetime(record.timestamp),
+    start_date_local: toLocalDatetime(record.timestamp, timezone),
     elapsed_time: record.duration ?? 0,
     description: buildDescription(record),
   };
@@ -129,10 +129,10 @@ export async function syncWorkouts(
   liftosaurClient: LiftosaurClient,
   destinations: SyncDestinations,
   db: SyncDatabase,
-  options: { fullSync?: boolean } = {}
+  options: { fullSync?: boolean; since?: string; timezone?: string } = {}
 ): Promise<SyncResult> {
   const result: SyncResult = { synced: 0, skipped: 0, errors: [] };
-  const since = options.fullSync ? undefined : db.getLastSyncedAt();
+  const since = options.fullSync ? undefined : (options.since ?? db.getLastSyncedAt());
 
   console.log(
     since ? `Fetching Liftosaur history since ${since}` : "Fetching full Liftosaur history"
@@ -165,9 +165,9 @@ export async function syncWorkouts(
     for (const [name, client] of pendingDestinations) {
       try {
         if (name === "intervals") {
-          await syncToIntervals(record, client as IntervalsClient, db);
+          await syncToIntervals(record, client as IntervalsClient, db, options.timezone);
         } else if (name === "strava") {
-          await syncToStrava(record, client as StravaClient, db);
+          await syncToStrava(record, client as StravaClient, db, options.timezone);
         }
         result.synced++;
         console.log(`  ✓ Synced "${buildEventName(record)}" → ${name} (${record.timestamp})`);

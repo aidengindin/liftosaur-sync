@@ -45,4 +45,5 @@ export const config = {
   db: {
     path: optional("DB_PATH", "sync-state.db"),
   },
+  timezone: process.env.TIMEZONE,
 };
