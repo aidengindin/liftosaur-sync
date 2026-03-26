@@ -58,7 +58,20 @@
         };
       in
       {
-        packages.default = liftosaur-sync;
+        packages = {
+          default = liftosaur-sync;
+          dockerImage = pkgs.dockerTools.buildLayeredImage {
+            name = "ghcr.io/aidengindin/liftosaur-sync";
+            tag = "latest";
+            contents = [ liftosaur-sync pkgs.cacert ];
+            config = {
+              Cmd = [ "${liftosaur-sync}/bin/liftosaur-sync" ];
+              ExposedPorts = { "3000/tcp" = {}; };
+              WorkingDir = "/data";
+              Env = [ "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ];
+            };
+          };
+        };
 
         apps = {
           # HTTP server (default)
