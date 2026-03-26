@@ -45,7 +45,8 @@ jobs:
 
       - name: Load and push Docker image
         run: |
-          IMAGE=$(docker load < docker-image | awk '{print $NF}')
+          set -euo pipefail
+          IMAGE=$(docker load < docker-image | grep -E 'Loaded image' | awk '{print $NF}')
           for TAG in $(echo '${{ steps.meta.outputs.tags }}' | tr '\n' ' '); do
             docker tag "$IMAGE" "$TAG"
             docker push "$TAG"
