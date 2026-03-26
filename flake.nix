@@ -63,11 +63,13 @@
           dockerImage = pkgs.dockerTools.buildLayeredImage {
             name = "ghcr.io/aidengindin/liftosaur-sync";
             tag = "latest";
-            contents = [ liftosaur-sync pkgs.cacert ];
+            contents = [ liftosaur-sync pkgs.cacert pkgs.dockerTools.fakeNss ];
+            extraCommands = "mkdir -p data";
             config = {
-              Cmd = [ "${liftosaur-sync}/bin/liftosaur-sync" ];
+              Entrypoint = [ "${liftosaur-sync}/bin/liftosaur-sync" ];
               ExposedPorts = { "3000/tcp" = {}; };
               WorkingDir = "/data";
+              User = "nobody";
               Env = [ "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ];
             };
           };
