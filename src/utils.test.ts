@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { parseSince, toLocalDatetime, calculateKgLifted } from "./utils.js";
+import { parseSince, toLocalDatetime, calculateKgLifted, calculateLoad } from "./utils.js";
 
 describe("parseSince", () => {
   const FIXED_NOW = new Date("2026-03-25T12:00:00.000Z");
@@ -77,5 +77,26 @@ describe("calculateKgLifted", () => {
   it("handles kg units without conversion", () => {
     const result = calculateKgLifted("Squat / 3x5 100kg");
     expect(result).toBeCloseTo(3 * 5 * 100, 1);
+  });
+});
+
+describe("calculateLoad", () => {
+  it("returns 50 when session equals average", () => {
+    expect(calculateLoad(1000, 1000)).toBe(50);
+  });
+
+  it("returns >50 for session above average", () => {
+    // 4000 vs 3500 avg → round((4000/3500)*50) = round(57.14) = 57
+    expect(calculateLoad(4000, 3500)).toBe(57);
+  });
+
+  it("returns <50 for session below average", () => {
+    // 3000 vs 3500 avg → round((3000/3500)*50) = round(42.86) = 43
+    expect(calculateLoad(3000, 3500)).toBe(43);
+  });
+
+  it("rounds to nearest integer", () => {
+    // 1 vs 3 → round(16.666) = 17
+    expect(calculateLoad(1, 3)).toBe(17);
   });
 });
