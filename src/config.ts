@@ -46,4 +46,8 @@ export const config = {
     path: optional("DB_PATH", "sync-state.db"),
   },
   timezone: process.env.TIMEZONE,
+  load: {
+    enabled: flagEnabled("ENABLE_LOAD_CALCULATION", false),
+    windowWeeks: parseInt(optional("LOAD_WINDOW_WEEKS", "6"), 10),
+  },
 };
