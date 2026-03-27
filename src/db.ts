@@ -110,7 +110,7 @@ export class SyncDatabase {
            AND tonnage_kg IS NOT NULL AND tonnage_kg > 0
            AND synced_at >= datetime('now', ?)`
       )
-      .get(`-${windowWeeks} weeks`) as { avg: number | null };
+      .get(`-${windowWeeks * 7} days`) as { avg: number | null };
     return row.avg ?? undefined;
   }
 

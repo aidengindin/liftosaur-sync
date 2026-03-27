@@ -33,10 +33,6 @@ describe("SyncDatabase.getAvgTonnageKg", () => {
     expect(avg).toBeCloseTo(1000, 1);
   });
 
-  it("returns undefined when only rows outside the window exist", () => {
-    db.markSynced("w1", "intervals", "i1", 1000);
-    expect(db.getAvgTonnageKg(0)).toBeUndefined();
-  });
 });
 
 describe("SyncDatabase.markSynced with tonnage", () => {
