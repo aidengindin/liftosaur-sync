@@ -67,6 +67,14 @@ export class SyncDatabase {
         DROP TABLE synced_workouts_legacy;
       `);
     }
+
+    // Add tonnage_kg column if not present (v2 migration)
+    const synced_cols = (
+      this.db.pragma("table_info(synced_workouts)") as Array<{ name: string }>
+    ).map((c) => c.name);
+    if (!synced_cols.includes("tonnage_kg")) {
+      this.db.exec(`ALTER TABLE synced_workouts ADD COLUMN tonnage_kg REAL;`);
+    }
   }
 
   isSynced(liftosaurId: string, destination: string): boolean {
@@ -81,15 +89,29 @@ export class SyncDatabase {
   markSynced(
     liftosaurId: string,
     destination: string,
-    destinationId: string
+    destinationId: string,
+    tonnageKg?: number
   ): void {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO synced_workouts
-           (liftosaur_id, destination, destination_id, synced_at)
-         VALUES (?, ?, ?, datetime('now'))`
+           (liftosaur_id, destination, destination_id, synced_at, tonnage_kg)
+         VALUES (?, ?, ?, datetime('now'), ?)`
       )
-      .run(liftosaurId, destination, destinationId);
+      .run(liftosaurId, destination, destinationId, tonnageKg ?? null);
+  }
+
+  getAvgTonnageKg(windowWeeks: number): number | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT AVG(tonnage_kg) as avg
+         FROM synced_workouts
+         WHERE destination = 'intervals'
+           AND tonnage_kg IS NOT NULL AND tonnage_kg > 0
+           AND synced_at >= datetime('now', ?)`
+      )
+      .get(`-${windowWeeks} weeks`) as { avg: number | null };
+    return row.avg ?? undefined;
   }
 
   getLastSyncedAt(): string | undefined {
