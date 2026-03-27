@@ -6,6 +6,7 @@ export interface IntervalsActivity {
   elapsed_time?: number;
   description?: string;
   kg_lifted?: number;
+  load?: number;
   external_id?: string;
 }
 
