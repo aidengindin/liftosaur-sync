@@ -86,7 +86,7 @@ app.post("/sync", authenticate, async (req: Request, res: Response) => {
 
   try {
     console.log(`Starting ${formatSyncLabel(fullSync, sinceDate)} sync…`);
-    const result = await syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone });
+    const result = await syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone, loadWindowWeeks: config.load.enabled ? config.load.windowWeeks : undefined });
     console.log(
       `Sync complete — synced: ${result.synced}, skipped: ${result.skipped}, errors: ${result.errors.length}`
     );
