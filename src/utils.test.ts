@@ -99,4 +99,8 @@ describe("calculateLoad", () => {
     // 1 vs 3 → round(16.666) = 17
     expect(calculateLoad(1, 3)).toBe(17);
   });
+
+  it("throws when avgTonnageKg is zero", () => {
+    expect(() => calculateLoad(1000, 0)).toThrow("avgTonnageKg must be > 0");
+  });
 });

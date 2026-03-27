@@ -95,5 +95,6 @@ export function calculateKgLifted(exercisesText: string): number {
  * Formula: round((sessionTonnageKg / avgTonnageKg) * 50)
  */
 export function calculateLoad(sessionTonnageKg: number, avgTonnageKg: number): number {
+  if (avgTonnageKg <= 0) throw new Error("avgTonnageKg must be > 0");
   return Math.round((sessionTonnageKg / avgTonnageKg) * 50);
 }
