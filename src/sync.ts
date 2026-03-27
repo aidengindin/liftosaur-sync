@@ -2,7 +2,7 @@ import { LiftosaurClient, LiftosaurHistoryRecord } from "./liftosaur.js";
 import { IntervalsClient, IntervalsActivity } from "./intervals.js";
 import { StravaClient, StravaConflictError, StravaCreateActivityParams } from "./strava.js";
 import { SyncDatabase } from "./db.js";
-import { toLocalDatetime, calculateKgLifted } from "./utils.js";
+import { toLocalDatetime, calculateKgLifted, calculateLoad } from "./utils.js";
 
 export interface SyncResult {
   synced: number;
@@ -49,9 +49,19 @@ async function syncToIntervals(
   record: LiftosaurHistoryRecord,
   client: IntervalsClient,
   db: SyncDatabase,
-  timezone?: string
+  timezone?: string,
+  loadWindowWeeks?: number
 ): Promise<void> {
   const kgLifted = record.exercisesText ? calculateKgLifted(record.exercisesText) : undefined;
+
+  let load: number | undefined;
+  if (loadWindowWeeks !== undefined && kgLifted && kgLifted > 0) {
+    const avg = db.getAvgTonnageKg(loadWindowWeeks);
+    if (avg !== undefined) {
+      load = calculateLoad(kgLifted, avg);
+    }
+  }
+
   const activity: IntervalsActivity = {
     start_date_local: toLocalDatetime(record.timestamp, timezone),
     name: buildEventName(record),
@@ -60,10 +70,12 @@ async function syncToIntervals(
     external_id: `liftosaur:${record.id}`,
     ...(record.duration ? { moving_time: record.duration, elapsed_time: record.duration } : {}),
     ...(kgLifted ? { kg_lifted: kgLifted } : {}),
+    ...(load !== undefined ? { load } : {}),
   };
 
   const created = await client.createActivity(activity);
-  db.markSynced(record.id, "intervals", String(created.id));
+  // Always store tonnage so it contributes to future rolling averages
+  db.markSynced(record.id, "intervals", String(created.id), kgLifted);
 }
 
 async function syncToStrava(
@@ -106,7 +118,7 @@ export async function syncWorkouts(
   liftosaurClient: LiftosaurClient,
   destinations: SyncDestinations,
   db: SyncDatabase,
-  options: { fullSync?: boolean; since?: string; timezone?: string } = {}
+  options: { fullSync?: boolean; since?: string; timezone?: string; loadWindowWeeks?: number } = {}
 ): Promise<SyncResult> {
   const result: SyncResult = { synced: 0, skipped: 0, errors: [] };
   const since = options.fullSync ? undefined : (options.since ?? db.getLastSyncedAt());
@@ -142,7 +154,7 @@ export async function syncWorkouts(
     for (const [name, client] of pendingDestinations) {
       try {
         if (name === "intervals") {
-          await syncToIntervals(record, client as IntervalsClient, db, options.timezone);
+          await syncToIntervals(record, client as IntervalsClient, db, options.timezone, options.loadWindowWeeks);
         } else if (name === "strava") {
           await syncToStrava(record, client as StravaClient, db, options.timezone);
         }
