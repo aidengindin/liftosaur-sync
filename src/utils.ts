@@ -88,3 +88,12 @@ export function calculateKgLifted(exercisesText: string): number {
   }
   return Math.round(total * 10) / 10;
 }
+
+/**
+ * Calculate TSS-style load using Joe Friel's weight training method.
+ * Average session tonnage is calibrated at 50 TSS.
+ * Formula: round((sessionTonnageKg / avgTonnageKg) * 50)
+ */
+export function calculateLoad(sessionTonnageKg: number, avgTonnageKg: number): number {
+  return Math.round((sessionTonnageKg / avgTonnageKg) * 50);
+}
