@@ -48,6 +48,10 @@ export const config = {
   timezone: process.env.TIMEZONE,
   load: {
     enabled: flagEnabled("ENABLE_LOAD_CALCULATION", false),
-    windowWeeks: parseInt(optional("LOAD_WINDOW_WEEKS", "6"), 10),
+    windowWeeks: (() => {
+      const n = parseInt(optional("LOAD_WINDOW_WEEKS", "6"), 10);
+      if (isNaN(n) || n <= 0) throw new Error(`Invalid LOAD_WINDOW_WEEKS: must be a positive integer`);
+      return n;
+    })(),
   },
 };
