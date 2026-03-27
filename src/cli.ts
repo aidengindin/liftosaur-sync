@@ -65,7 +65,12 @@ if (Object.keys(destinations).length === 0) {
 
 console.log(`Starting ${formatSyncLabel(fullSync, sinceDate)} sync to: ${Object.keys(destinations).join(", ")}…`);
 
-syncWorkouts(liftosaur, destinations, db, { fullSync, since: sinceDate, timezone: config.timezone })
+syncWorkouts(liftosaur, destinations, db, {
+  fullSync,
+  since: sinceDate,
+  timezone: config.timezone,
+  loadWindowWeeks: config.load.enabled ? config.load.windowWeeks : undefined,
+})
   .then((result) => {
     console.log(
       `\nDone — synced: ${result.synced}, skipped: ${result.skipped}, errors: ${result.errors.length}`
