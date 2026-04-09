@@ -150,8 +150,10 @@ export class StravaClient {
       throw new Error(`Strava API error ${response.status}: ${body}`);
     }
 
+    // Strava returns 201 Created; occasionally the body may be empty even on success.
+    // The activity was created, so return a minimal object rather than failing.
     if (!body) {
-      throw new Error(`Strava API returned empty response (status ${response.status})`);
+      return { id: 0, name: params.name, sport_type: params.sport_type } as StravaActivity;
     }
 
     return JSON.parse(body) as StravaActivity;
