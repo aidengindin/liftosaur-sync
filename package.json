@@ -11,9 +11,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@garmin/fitsdk": "^21.200.0",
     "better-sqlite3": "^9.6.0",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "garmin-connect": "^1.6.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
