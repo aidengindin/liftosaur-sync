@@ -176,6 +176,7 @@ export class GarminClient {
 
   async uploadWorkout(record: LiftosaurHistoryRecord): Promise<void> {
     const gc = await this.ensureLoggedIn();
+    await GarminClient.loadFitSdk();
 
     const fitData = this.buildFitFile(record);
     const tmpPath = path.join(os.tmpdir(), `liftosaur-${record.id}.fit`);
@@ -187,7 +188,7 @@ export class GarminClient {
         await gc.uploadActivity(tmpPath, "fit");
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        // Detect duplicate / conflict
+        // garmin-connect wraps HTTP errors in Error messages; check for 409 text since status code is not directly accessible
         if (msg.includes("409") || msg.toLowerCase().includes("already exists")) {
           throw new GarminConflictError();
         }
@@ -266,11 +267,10 @@ export class GarminClient {
     );
 
     // A serial number derived from the last 8 digits of the Liftosaur ID
-    const serialNumber = parseInt(record.id.slice(-8), 10) || 0;
+    const serialNumber = parseInt(String(record.id), 10) % 100_000_000;
 
     // 1. FILE_ID message
     encoder.onMesg(mesgNum.FILE_ID, {
-      mesgNum: mesgNum.FILE_ID,
       type: "activity",
       manufacturer: "development",
       product: 0,
@@ -288,7 +288,6 @@ export class GarminClient {
       const durationSecs = s.isWarmup ? 30 : s.reps * 3;
 
       encoder.onMesg(mesgNum.SET, {
-        mesgNum: mesgNum.SET,
         timestamp: setTime,
         startTime: setTime,
         // duration field has scale=1000 in FIT — pass value in seconds
@@ -304,12 +303,11 @@ export class GarminClient {
         messageIndex: messageIndex++,
       });
 
-      setTime = new Date(setTime.getTime() + 45_000);
+      setTime = new Date(setTime.getTime() + durationSecs * 1000);
     }
 
     // 3. LAP message
     encoder.onMesg(mesgNum.LAP, {
-      mesgNum: mesgNum.LAP,
       timestamp: endDate,
       startTime: startDate,
       totalElapsedTime: estimatedDurationSecs,
@@ -322,7 +320,6 @@ export class GarminClient {
 
     // 4. SESSION message
     encoder.onMesg(mesgNum.SESSION, {
-      mesgNum: mesgNum.SESSION,
       timestamp: endDate,
       startTime: startDate,
       totalElapsedTime: estimatedDurationSecs,
@@ -337,7 +334,6 @@ export class GarminClient {
 
     // 5. ACTIVITY message
     encoder.onMesg(mesgNum.ACTIVITY, {
-      mesgNum: mesgNum.ACTIVITY,
       timestamp: endDate,
       totalTimerTime: estimatedDurationSecs,
       numSessions: 1,
