@@ -32,14 +32,12 @@ function makeStravaClient(): StravaClient | undefined {
 
 function makeGarminClient(): GarminClient | undefined {
   if (!config.garmin.enabled) return undefined;
-  const tokens = db.getGarminTokens();
-  return new GarminClient(
-    config.garmin.password
-      ? { username: config.garmin.username, password: config.garmin.password }
-      : null,
-    tokens ?? null,
-    (t) => db.saveGarminTokens(t)
-  );
+  const tokens = db.getGarminTokens() ?? null;
+  const credentials = config.garmin.password
+    ? { username: config.garmin.username, password: config.garmin.password }
+    : null;
+  if (tokens === null && credentials === null) return undefined;
+  return new GarminClient(credentials, tokens, (t) => db.saveGarminTokens(t));
 }
 
 /** Optional bearer-token auth for sync/status endpoints */
