@@ -4,11 +4,11 @@ import { lookupExercise } from "./garmin-exercise-map.js";
 describe("lookupExercise", () => {
   describe("exact matches", () => {
     it("squat", () => {
-      expect(lookupExercise("squat")).toEqual({ category: "squat", name: "barbellSquat" });
+      expect(lookupExercise("squat")).toEqual({ category: "squat", name: "barbellBackSquat" });
     });
 
     it("deadlift", () => {
-      expect(lookupExercise("deadlift")).toEqual({ category: "deadlift", name: "deadlift" });
+      expect(lookupExercise("deadlift")).toEqual({ category: "deadlift", name: "barbellDeadlift" });
     });
 
     it("bench press", () => {
@@ -40,13 +40,13 @@ describe("lookupExercise", () => {
     });
 
     it("ab wheel", () => {
-      expect(lookupExercise("ab wheel")).toEqual({ category: "coreExercise", name: "abWheelRollout" });
+      expect(lookupExercise("ab wheel")).toEqual({ category: "core", name: "kneelingAbWheel" });
     });
   });
 
   describe("Liftosaur-style names with equipment suffix (comma format)", () => {
     it('Squat, Barbell → squat mapping', () => {
-      expect(lookupExercise("Squat, Barbell")).toEqual({ category: "squat", name: "barbellSquat" });
+      expect(lookupExercise("Squat, Barbell")).toEqual({ category: "squat", name: "barbellBackSquat" });
     });
 
     it('Bench Press, Barbell → bench press mapping', () => {
@@ -54,7 +54,7 @@ describe("lookupExercise", () => {
     });
 
     it('Deadlift, Barbell → deadlift mapping', () => {
-      expect(lookupExercise("Deadlift, Barbell")).toEqual({ category: "deadlift", name: "deadlift" });
+      expect(lookupExercise("Deadlift, Barbell")).toEqual({ category: "deadlift", name: "barbellDeadlift" });
     });
 
     it('Overhead Press, Barbell → overhead press mapping', () => {
@@ -70,17 +70,17 @@ describe("lookupExercise", () => {
     });
 
     it('Hip Thrust, Barbell → hip thrust mapping', () => {
-      expect(lookupExercise("Hip Thrust, Barbell")).toEqual({ category: "hipSwing", name: "barbellHipThrust" });
+      expect(lookupExercise("Hip Thrust, Barbell")).toEqual({ category: "hipRaise", name: "barbellHipThrustWithBench" });
     });
 
     it('Lat Pulldown, Cable → lat pulldown mapping', () => {
-      expect(lookupExercise("Lat Pulldown, Cable")).toEqual({ category: "latPullDown", name: "latPullDown" });
+      expect(lookupExercise("Lat Pulldown, Cable")).toEqual({ category: "pullUp", name: "latPulldown" });
     });
   });
 
   describe("names with parenthetical equipment", () => {
     it('Squat (Barbell) → squat mapping', () => {
-      expect(lookupExercise("Squat (Barbell)")).toEqual({ category: "squat", name: "barbellSquat" });
+      expect(lookupExercise("Squat (Barbell)")).toEqual({ category: "squat", name: "barbellBackSquat" });
     });
 
     it('Bench Press (Barbell) → bench press mapping', () => {
@@ -88,7 +88,7 @@ describe("lookupExercise", () => {
     });
 
     it('Deadlift (Barbell) → deadlift mapping', () => {
-      expect(lookupExercise("Deadlift (Barbell)")).toEqual({ category: "deadlift", name: "deadlift" });
+      expect(lookupExercise("Deadlift (Barbell)")).toEqual({ category: "deadlift", name: "barbellDeadlift" });
     });
 
     it('Overhead Press (Barbell) → overhead press mapping', () => {
@@ -98,7 +98,7 @@ describe("lookupExercise", () => {
 
   describe("case insensitivity", () => {
     it("SQUAT uppercase", () => {
-      expect(lookupExercise("SQUAT")).toEqual({ category: "squat", name: "barbellSquat" });
+      expect(lookupExercise("SQUAT")).toEqual({ category: "squat", name: "barbellBackSquat" });
     });
 
     it("Bench Press mixed case", () => {
@@ -106,7 +106,7 @@ describe("lookupExercise", () => {
     });
 
     it("DEADLIFT uppercase", () => {
-      expect(lookupExercise("DEADLIFT")).toEqual({ category: "deadlift", name: "deadlift" });
+      expect(lookupExercise("DEADLIFT")).toEqual({ category: "deadlift", name: "barbellDeadlift" });
     });
 
     it("Pull Up mixed case", () => {
@@ -128,9 +128,15 @@ describe("lookupExercise", () => {
     });
   });
 
-  describe("additional compound lifts", () => {
+  describe("trailing-word fallback (space-separated equipment without comma or parens)", () => {
+    it('Squat Barbell → squat mapping via trailing-word strip', () => {
+      expect(lookupExercise("Squat Barbell")).toEqual({ category: "squat", name: "barbellBackSquat" });
+    });
+  });
+
+  describe("remaining exercises", () => {
     it("front squat", () => {
-      expect(lookupExercise("front squat")).toEqual({ category: "squat", name: "frontSquat" });
+      expect(lookupExercise("front squat")).toEqual({ category: "squat", name: "barbellFrontSquat" });
     });
 
     it("goblet squat", () => {
@@ -138,11 +144,11 @@ describe("lookupExercise", () => {
     });
 
     it("bulgarian split squat", () => {
-      expect(lookupExercise("bulgarian split squat")).toEqual({ category: "squat", name: "bulgarianSplitSquat" });
+      expect(lookupExercise("bulgarian split squat")).toEqual({ category: "squat", name: "dumbbellSplitSquat" });
     });
 
     it("leg press", () => {
-      expect(lookupExercise("leg press")).toEqual({ category: "legPress", name: "legPress" });
+      expect(lookupExercise("leg press")).toEqual({ category: "squat", name: "legPress" });
     });
 
     it("sumo deadlift", () => {
@@ -162,15 +168,15 @@ describe("lookupExercise", () => {
     });
 
     it("military press", () => {
-      expect(lookupExercise("military press")).toEqual({ category: "shoulderPress", name: "barbellShoulderPress" });
+      expect(lookupExercise("military press")).toEqual({ category: "shoulderPress", name: "militaryPress" });
     });
 
     it("push press", () => {
-      expect(lookupExercise("push press")).toEqual({ category: "shoulderPress", name: "pushPress" });
+      expect(lookupExercise("push press")).toEqual({ category: "shoulderPress", name: "barbellPushPress" });
     });
 
     it("dips", () => {
-      expect(lookupExercise("dips")).toEqual({ category: "pushUp", name: "weightedDips" });
+      expect(lookupExercise("dips")).toEqual({ category: "tricepsExtension", name: "weightedDip" });
     });
 
     it("push up", () => {
@@ -186,35 +192,38 @@ describe("lookupExercise", () => {
     });
 
     it("bent over row", () => {
-      expect(lookupExercise("bent over row")).toEqual({ category: "row", name: "bentOverRow" });
+      expect(lookupExercise("bent over row")).toEqual({ category: "row", name: "bentOverRowWithBarbell" });
     });
 
     it("cable row", () => {
-      expect(lookupExercise("cable row")).toEqual({ category: "row", name: "cableRow" });
+      expect(lookupExercise("cable row")).toEqual({ category: "row", name: "seatedCableRow" });
     });
 
     it("lat pulldown", () => {
-      expect(lookupExercise("lat pulldown")).toEqual({ category: "latPullDown", name: "latPullDown" });
+      expect(lookupExercise("lat pulldown")).toEqual({ category: "pullUp", name: "latPulldown" });
     });
 
     it("barbell curl", () => {
-      expect(lookupExercise("barbell curl")).toEqual({ category: "curl", name: "barbellCurl" });
+      expect(lookupExercise("barbell curl")).toEqual({ category: "curl", name: "barbellBicepsCurl" });
     });
 
     it("dumbbell curl", () => {
-      expect(lookupExercise("dumbbell curl")).toEqual({ category: "curl", name: "dumbbellCurl" });
+      expect(lookupExercise("dumbbell curl")).toEqual({ category: "curl", name: "dumbbellBicepsCurl" });
     });
 
     it("tricep pushdown", () => {
-      expect(lookupExercise("tricep pushdown")).toEqual({ category: "tricepsExtension", name: "tricepsExtension" });
+      expect(lookupExercise("tricep pushdown")).toEqual({ category: "tricepsExtension", name: "tricepsPressdown" });
     });
 
     it("skull crusher", () => {
-      expect(lookupExercise("skull crusher")).toEqual({ category: "tricepsExtension", name: "lyingBarbell" });
+      expect(lookupExercise("skull crusher")).toEqual({ category: "tricepsExtension", name: "lyingEzBarTricepsExtension" });
     });
 
     it("overhead tricep extension", () => {
-      expect(lookupExercise("overhead tricep extension")).toEqual({ category: "tricepsExtension", name: "overheadBarbell" });
+      expect(lookupExercise("overhead tricep extension")).toEqual({
+        category: "tricepsExtension",
+        name: "seatedBarbellOverheadTricepsExtension",
+      });
     });
   });
 });
