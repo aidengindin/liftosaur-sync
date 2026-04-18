@@ -1,6 +1,7 @@
 import { LiftosaurClient, LiftosaurHistoryRecord } from "./liftosaur.js";
 import { IntervalsClient, IntervalsActivity } from "./intervals.js";
 import { StravaClient, StravaConflictError, StravaCreateActivityParams } from "./strava.js";
+import { GarminClient, GarminConflictError } from "./garmin.js";
 import { SyncDatabase } from "./db.js";
 import { toLocalDatetime, calculateKgLifted, calculateLoad } from "./utils.js";
 
@@ -105,6 +106,24 @@ async function syncToStrava(
   }
 }
 
+async function syncToGarmin(
+  record: LiftosaurHistoryRecord,
+  client: GarminClient,
+  db: SyncDatabase
+): Promise<void> {
+  try {
+    await client.uploadWorkout(record);
+    db.markSynced(record.id, "garmin", "uploaded");
+  } catch (err) {
+    if (err instanceof GarminConflictError) {
+      console.log(`  ⚠ Garmin: activity already exists, marking as synced`);
+      db.markSynced(record.id, "garmin", "conflict");
+      return;
+    }
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main sync orchestrator
 // ---------------------------------------------------------------------------
@@ -112,6 +131,7 @@ async function syncToStrava(
 export interface SyncDestinations {
   intervals?: IntervalsClient;
   strava?: StravaClient;
+  garmin?: GarminClient;
 }
 
 export async function syncWorkouts(
@@ -132,7 +152,7 @@ export async function syncWorkouts(
 
   const activeDestinations = Object.entries(destinations).filter(
     ([, client]) => client !== undefined
-  ) as [string, IntervalsClient | StravaClient][];
+  ) as [string, IntervalsClient | StravaClient | GarminClient][];
 
   if (activeDestinations.length === 0) {
     console.warn("No sync destinations configured");
@@ -157,6 +177,8 @@ export async function syncWorkouts(
           await syncToIntervals(record, client as IntervalsClient, db, options.timezone, options.loadWindowWeeks);
         } else if (name === "strava") {
           await syncToStrava(record, client as StravaClient, db, options.timezone);
+        } else if (name === "garmin") {
+          await syncToGarmin(record, client as GarminClient, db);
         }
         result.synced++;
         console.log(`  ✓ Synced "${buildEventName(record)}" → ${name} (${record.timestamp})`);
