@@ -2,6 +2,11 @@ import Database from "better-sqlite3";
 import path from "path";
 import type { StravaTokens } from "./strava.js";
 
+export interface GarminTokens {
+  oauth1: { oauth_token: string; oauth_token_secret: string };
+  oauth2: { access_token: string; refresh_token: string; expires_at: number; [k: string]: unknown };
+}
+
 export interface SyncRecord {
   liftosaur_id: string;
   destination: string;
@@ -41,6 +46,15 @@ export class SyncDatabase {
         access_token    TEXT NOT NULL,
         refresh_token   TEXT NOT NULL,
         expires_at      INTEGER NOT NULL
+      );
+
+      -- OAuth tokens for Garmin Connect (OAuth 1.0a + OAuth 2.0)
+      CREATE TABLE IF NOT EXISTS garmin_tokens (
+        id           INTEGER PRIMARY KEY CHECK (id = 1),
+        oauth1_token TEXT NOT NULL,
+        oauth1_secret TEXT NOT NULL,
+        oauth2_json  TEXT NOT NULL,
+        updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
 
@@ -169,6 +183,33 @@ export class SyncDatabase {
          VALUES ('strava', ?, ?, ?)`
       )
       .run(tokens.accessToken, tokens.refreshToken, tokens.expiresAt);
+  }
+
+  getGarminTokens(): GarminTokens | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM garmin_tokens WHERE id = 1")
+      .get() as
+      | { oauth1_token: string; oauth1_secret: string; oauth2_json: string }
+      | undefined;
+
+    if (!row) return undefined;
+    return {
+      oauth1: {
+        oauth_token: row.oauth1_token,
+        oauth_token_secret: row.oauth1_secret,
+      },
+      oauth2: JSON.parse(row.oauth2_json),
+    };
+  }
+
+  saveGarminTokens(tokens: GarminTokens): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO garmin_tokens
+           (id, oauth1_token, oauth1_secret, oauth2_json, updated_at)
+         VALUES (1, ?, ?, ?, datetime('now'))`
+      )
+      .run(tokens.oauth1.oauth_token, tokens.oauth1.oauth_token_secret, JSON.stringify(tokens.oauth2));
   }
 
   close(): void {

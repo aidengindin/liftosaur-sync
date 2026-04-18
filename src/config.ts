@@ -36,6 +36,11 @@ export const config = {
     clientId: process.env.STRAVA_CLIENT_ID ?? "",
     clientSecret: process.env.STRAVA_CLIENT_SECRET ?? "",
   },
+  garmin: {
+    enabled: flagEnabled("GARMIN_ENABLED", true) && !!(process.env.GARMIN_USERNAME),
+    username: process.env.GARMIN_USERNAME ?? "",
+    password: process.env.GARMIN_PASSWORD ?? "",
+  },
   server: {
     port: parseInt(optional("PORT", "3000"), 10),
     baseUrl: optional("BASE_URL", "http://localhost:3000"),
