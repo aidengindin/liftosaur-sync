@@ -160,7 +160,7 @@ export class GarminClient {
       await gc.login(this.credentials.username, this.credentials.password);
       const exported = gc.exportToken();
       this.tokens = exported as unknown as GarminTokens;
-      this.onTokensSaved(this.tokens);
+      // Tokens are persisted once via the post-upload onTokensSaved call in uploadWorkout
     } else {
       throw new Error(
         "Garmin not authorized. Run: npm run sync -- --garmin-login"

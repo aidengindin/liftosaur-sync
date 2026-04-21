@@ -81,30 +81,65 @@ const sampleTokens: GarminTokens = {
 // buildFitFile() tests
 // ---------------------------------------------------------------------------
 
+type FitModuleWithDecoder = {
+  Stream: {
+    fromByteArray(data: number[]): unknown;
+  };
+  Decoder: new (stream: unknown) => {
+    read(): { messages: Record<string, unknown[]>; errors: unknown[] };
+  };
+};
+
 describe("buildFitFile()", () => {
   beforeAll(async () => {
     await GarminClient.loadFitSdk();
   });
 
-  it("returns a non-empty Uint8Array for a record with work sets and warmup sets", () => {
+  it("returns valid FIT bytes with SET and SESSION messages for a record with work sets", () => {
     const client = new GarminClient(null, sampleTokens, vi.fn());
-    const result = client.buildFitFile(sampleRecord);
-    expect(result).toBeInstanceOf(Uint8Array);
-    expect(result.length).toBeGreaterThan(0);
+    const bytes = client.buildFitFile(sampleRecord);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(0);
+
+    // Decode the FIT file and verify content
+    const sdk = (GarminClient as unknown as { _fitModule: FitModuleWithDecoder })._fitModule!;
+    const stream = sdk.Stream.fromByteArray(Array.from(bytes));
+    const decoder = new sdk.Decoder(stream);
+    const { messages, errors } = decoder.read();
+
+    expect(errors).toHaveLength(0);
+    // Should have SET messages for the work sets
+    expect((messages as { setMesgs?: unknown[] }).setMesgs?.length).toBeGreaterThan(0);
+    // SESSION message should have sport = "training"
+    const sessionMesgs = (messages as { sessionMesgs?: Array<{ sport: string }> }).sessionMesgs;
+    expect(sessionMesgs).toBeDefined();
+    expect(sessionMesgs![0].sport).toBe("training");
   });
 
-  it("returns a non-empty Uint8Array for a record with no exercisesText", () => {
+  it("produces valid FIT bytes for a record with no exercisesText", () => {
     const client = new GarminClient(null, sampleTokens, vi.fn());
-    const result = client.buildFitFile(emptyRecord);
-    expect(result).toBeInstanceOf(Uint8Array);
-    expect(result.length).toBeGreaterThan(0);
+    const bytes = client.buildFitFile(emptyRecord);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(0);
+
+    const sdk = (GarminClient as unknown as { _fitModule: FitModuleWithDecoder })._fitModule!;
+    const stream = sdk.Stream.fromByteArray(Array.from(bytes));
+    const decoder = new sdk.Decoder(stream);
+    const { errors } = decoder.read();
+    expect(errors).toHaveLength(0);
   });
 
-  it("returns a non-empty Uint8Array for a record with only duration, no exercises", () => {
+  it("produces valid FIT bytes for a record with only duration, no exercises", () => {
     const client = new GarminClient(null, sampleTokens, vi.fn());
-    const result = client.buildFitFile(durationOnlyRecord);
-    expect(result).toBeInstanceOf(Uint8Array);
-    expect(result.length).toBeGreaterThan(0);
+    const bytes = client.buildFitFile(durationOnlyRecord);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(0);
+
+    const sdk = (GarminClient as unknown as { _fitModule: FitModuleWithDecoder })._fitModule!;
+    const stream = sdk.Stream.fromByteArray(Array.from(bytes));
+    const decoder = new sdk.Decoder(stream);
+    const { errors } = decoder.read();
+    expect(errors).toHaveLength(0);
   });
 
   it("throws if loadFitSdk() was not called (simulated by resetting internal state)", () => {
@@ -113,10 +148,12 @@ describe("buildFitFile()", () => {
     (GarminClient as unknown as { _fitModule: unknown })._fitModule = null;
 
     const client = new GarminClient(null, sampleTokens, vi.fn());
-    expect(() => client.buildFitFile(sampleRecord)).toThrow("FIT SDK not loaded");
-
-    // Restore
-    (GarminClient as unknown as { _fitModule: unknown })._fitModule = savedModule;
+    try {
+      expect(() => client.buildFitFile(sampleRecord)).toThrow("FIT SDK not loaded");
+    } finally {
+      // Always restore so subsequent tests are not broken
+      (GarminClient as unknown as { _fitModule: unknown })._fitModule = savedModule;
+    }
   });
 });
 
@@ -142,11 +179,17 @@ describe("uploadWorkout()", () => {
     expect(mockLoadToken).toHaveBeenCalledWith(sampleTokens.oauth1, sampleTokens.oauth2);
     expect(mockLogin).not.toHaveBeenCalled();
     expect(mockWriteFile).toHaveBeenCalledOnce();
-    const [writtenPath] = mockWriteFile.mock.calls[0] as [string, ...unknown[]];
+    const [writtenPath, writtenBytes] = mockWriteFile.mock.calls[0] as [string, unknown];
     expect(writtenPath).toMatch(/\.fit$/);
+    expect(writtenBytes).toBeInstanceOf(Uint8Array);
+    expect((writtenBytes as Uint8Array).length).toBeGreaterThan(0);
     expect(mockUploadActivity).toHaveBeenCalledWith(writtenPath, "fit");
     expect(mockUnlink).toHaveBeenCalledWith(writtenPath);
     expect(onTokensSaved).toHaveBeenCalledOnce();
+    expect(onTokensSaved.mock.calls[0][0]).toMatchObject({
+      oauth1: { oauth_token: expect.any(String), oauth_token_secret: expect.any(String) },
+      oauth2: { access_token: expect.any(String), refresh_token: expect.any(String) },
+    });
   });
 
   it("credential login path: calls login(), exportToken(), and onTokensSaved when tokens are null", async () => {
@@ -159,9 +202,7 @@ describe("uploadWorkout()", () => {
     expect(mockLogin).toHaveBeenCalledWith(credentials.username, credentials.password);
     expect(mockLoadToken).not.toHaveBeenCalled();
     expect(mockExportToken).toHaveBeenCalled();
-    // onTokensSaved is called once after login (in ensureLoggedIn) and once after
-    // upload (post-upload token refresh), so at least once is the correct assertion.
-    expect(onTokensSaved).toHaveBeenCalled();
+    expect(onTokensSaved).toHaveBeenCalledOnce();
   });
 
   it("throws GarminConflictError when uploadActivity fails with 409 message", async () => {
