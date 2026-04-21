@@ -333,6 +333,8 @@ export class GarminClient {
     });
 
     // 5. ACTIVITY message
+    // localTimestamp must be a number (Unix seconds), not a Date — the FIT SDK
+    // does not accept Date objects for this field.
     encoder.onMesg(mesgNum.ACTIVITY, {
       timestamp: endDate,
       totalTimerTime: estimatedDurationSecs,
@@ -340,7 +342,7 @@ export class GarminClient {
       type: "manual",
       event: "activity",
       eventType: "stop",
-      localTimestamp: startDate,
+      localTimestamp: Math.floor(startDate.getTime() / 1000),
     });
 
     return encoder.close();
