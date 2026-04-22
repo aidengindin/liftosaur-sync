@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Tests that use `better-sqlite3` (e.g. `src/db.test.ts`) must run inside the Nix dev shell — use `nix develop --command npm test`. The native binary requires the Python build tools only available there.
+Run all tests inside the Nix dev shell — use `nix develop --command npm test`. The native binary requires the Python build tools only available there.
 
 ```bash
 nix develop --command npm test  # Run tests (required for db tests)

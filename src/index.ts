@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { LiftosaurClient } from "./liftosaur.js";
 import { IntervalsClient } from "./intervals.js";
 import { StravaClient } from "./strava.js";
+import { GarminClient } from "./garmin.js";
 import { SyncDatabase } from "./db.js";
 import { syncWorkouts, SyncDestinations } from "./sync.js";
 import { parseSince, formatSyncLabel } from "./utils.js";
@@ -29,6 +30,16 @@ function makeStravaClient(): StravaClient | undefined {
   );
 }
 
+function makeGarminClient(): GarminClient | undefined {
+  if (!config.garmin.enabled) return undefined;
+  const tokens = db.getGarminTokens() ?? null;
+  const credentials = config.garmin.password
+    ? { username: config.garmin.username, password: config.garmin.password }
+    : null;
+  if (tokens === null && credentials === null) return undefined;
+  return new GarminClient(credentials, tokens, (t) => db.saveGarminTokens(t));
+}
+
 /** Optional bearer-token auth for sync/status endpoints */
 function authenticate(req: Request, res: Response, next: NextFunction): void {
   if (!config.server.syncSecret) {
@@ -44,6 +55,13 @@ function authenticate(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+// Pre-load the FIT SDK at startup if Garmin is enabled
+if (config.garmin.enabled) {
+  GarminClient.loadFitSdk().catch((err) => {
+    console.error("Failed to load Garmin FIT SDK:", err instanceof Error ? err.message : String(err));
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -55,6 +73,7 @@ app.get("/health", (_req, res) => {
     destinations: {
       intervals: config.intervals.enabled,
       strava: config.strava.enabled && db.getStravaTokens() !== undefined,
+      garmin: config.garmin.enabled && db.getGarminTokens() !== undefined,
     },
   });
 });
@@ -79,9 +98,11 @@ app.post("/sync", authenticate, async (req: Request, res: Response) => {
   }
 
   const strava = makeStravaClient();
+  const garmin = makeGarminClient();
   const destinations: SyncDestinations = {
     ...(intervals ? { intervals } : {}),
     ...(strava ? { strava } : {}),
+    ...(garmin ? { garmin } : {}),
   };
 
   try {
@@ -180,6 +201,13 @@ const server = app.listen(config.server.port, () => {
     console.log(`  GET  /auth/strava        — connect Strava account`);
     if (!db.getStravaTokens()) {
       console.warn("  ⚠ Strava is configured but not yet authorized. Visit /auth/strava to connect.");
+    }
+  }
+  if (config.garmin.enabled) {
+    if (!db.getGarminTokens()) {
+      console.warn("  ⚠ Garmin enabled but not authorized — run: npm run sync -- --garmin-login");
+    } else {
+      console.log("  ✓ Garmin Connect ready");
     }
   }
 });
