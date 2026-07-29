@@ -45,7 +45,9 @@ export const config = {
   db: {
     path: optional("DB_PATH", "sync-state.db"),
   },
-  timezone: process.env.TIMEZONE,
+  // TIMEZONE is kept for backwards compatibility; TZ is the standard variable
+  // used by Node and most container runtimes.
+  timezone: process.env.TIMEZONE ?? process.env.TZ,
   load: {
     enabled: flagEnabled("ENABLE_LOAD_CALCULATION", false),
     windowWeeks: (() => {

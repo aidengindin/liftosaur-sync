@@ -3,6 +3,7 @@ import { syncWorkouts } from "./sync.js";
 import { SyncDatabase } from "./db.js";
 import { LiftosaurClient } from "./liftosaur.js";
 import { IntervalsClient } from "./intervals.js";
+import { StravaClient } from "./strava.js";
 
 // Minimal workout record for tests
 const WORKOUT = {
@@ -61,5 +62,31 @@ describe("syncWorkouts — load calculation", () => {
     const avg = db.getAvgTonnageKg(6);
     // Squat 3x5x100kg = 1500 kg
     expect(avg).toBeCloseTo(1500, 0);
+  });
+});
+
+describe("syncWorkouts — local timestamps", () => {
+  it("sends timezone-converted timestamps to Intervals.icu and Strava", async () => {
+    const db = new SyncDatabase(":memory:");
+    const liftosaur = {
+      getAllHistory: vi.fn().mockResolvedValue([WORKOUT]),
+    } as unknown as LiftosaurClient;
+    const intervals = {
+      createActivity: vi.fn().mockResolvedValue({ id: 999 }),
+    } as unknown as IntervalsClient;
+    const strava = {
+      createActivity: vi.fn().mockResolvedValue({ id: 1000 }),
+    } as unknown as StravaClient;
+
+    await syncWorkouts(liftosaur, { intervals, strava }, db, {
+      timezone: "America/New_York",
+    });
+
+    expect(intervals.createActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ start_date_local: "2026-03-27T06:00:00" })
+    );
+    expect(strava.createActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ start_date_local: "2026-03-27T06:00:00" })
+    );
   });
 });

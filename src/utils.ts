@@ -29,26 +29,28 @@ export function parseSince(input: string): string {
 
 /**
  * Normalize a Liftosaur timestamp to a local datetime string (YYYY-MM-DDTHH:mm:ss).
- * If timezone is provided, converts from UTC to that timezone first.
+ * Converts from UTC to the provided timezone, or to the host's local timezone
+ * when none is provided.
  */
 export function toLocalDatetime(isoString: string, timezone?: string): string {
-  if (timezone) {
-    const date = new Date(isoString);
-    const fmt = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-    const p = fmt.formatToParts(date);
-    const get = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
-    return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid workout timestamp: ${isoString}`);
   }
-  return isoString.replace(/\s*Z$/, "").replace(/\s*[+-]\d{2}:\d{2}$/, "").replace(" ", "T");
+
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    ...(timezone ? { timeZone: timezone } : {}),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const p = fmt.formatToParts(date);
+  const get = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
 /**
