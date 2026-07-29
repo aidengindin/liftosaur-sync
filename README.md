@@ -28,6 +28,10 @@ cp .env.example .env
 # Edit .env with your credentials
 ```
 
+Set `TIMEZONE` to your IANA timezone name (for example,
+`America/New_York`) so UTC workout timestamps are converted before being sent
+to Intervals.icu and Strava. The standard `TZ` variable is also supported.
+
 ### 3. Install & build
 
 ```bash

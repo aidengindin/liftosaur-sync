@@ -39,12 +39,12 @@ describe("parseSince", () => {
 });
 
 describe("toLocalDatetime", () => {
-  it("strips UTC Z suffix", () => {
-    expect(toLocalDatetime("2026-03-20T03:58:12Z")).toBe("2026-03-20T03:58:12");
-  });
-
-  it("strips +00:00 offset and converts space to T", () => {
-    expect(toLocalDatetime("2026-03-24 10:31:32 +00:00")).toBe("2026-03-24T10:31:32");
+  it("converts UTC to the host's local timezone when none is provided", () => {
+    const expected = toLocalDatetime(
+      "2026-03-20T03:58:12Z",
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    );
+    expect(toLocalDatetime("2026-03-20T03:58:12Z")).toBe(expected);
   });
 
   it("converts UTC to local time when timezone is provided", () => {
@@ -52,6 +52,10 @@ describe("toLocalDatetime", () => {
     expect(toLocalDatetime("2026-03-24 10:31:32 +00:00", "America/New_York")).toBe(
       "2026-03-24T06:31:32"
     );
+  });
+
+  it("rejects invalid timestamps instead of sending a mislabeled local time", () => {
+    expect(() => toLocalDatetime("not-a-date")).toThrow("Invalid workout timestamp");
   });
 });
 
