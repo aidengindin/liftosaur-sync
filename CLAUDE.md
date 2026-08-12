@@ -45,12 +45,18 @@ The `/api/v1/history` endpoint returns `{ id: number, text: string }[]` — **no
 }
 ```
 
-`parseHistoryText()` extracts fields from this format using regex. The `id` field is `startTime` in milliseconds and doubles as a fallback timestamp. All timestamps from Liftosaur are UTC; `TIMEZONE` config converts them to local time for destination APIs.
+`parseHistoryText()` extracts fields from this format using regex, then `parseExercises()` parses the exercises block into structured `exercises[]` with per-set reps/weight. It handles multiple comma-separated set groups, bilateral reps (`6|6`, expanded to one set per side), `warmup:` segments (kept, flagged `isWarmup`), `target:` segments (dropped — they are prescriptions, not performed work), and `//` comment lines. The `id` field is `startTime` in milliseconds and doubles as a fallback timestamp. All timestamps from Liftosaur are UTC; `TIMEZONE` config converts them to local time for destination APIs.
 
 ### Destinations
 
 - **Intervals.icu** (`src/intervals.ts`): HTTP Basic auth (`API_KEY:<key>`). Posts to `/activities/manual` (completed activity, not `/events` which is planned).
-- **Strava** (`src/strava.ts`): OAuth 2.0, tokens stored in SQLite and auto-refreshed. 409 responses are treated as "already exists" and marked synced rather than errored.
+- **Strava** (`src/strava.ts`): OAuth 2.0, tokens stored in SQLite and auto-refreshed. Workouts go through `POST /uploads` with `data_type=json`, which carries per-set data so they appear in Strava's strength log with muscle maps — *not* `POST /activities`, which supports only a name and duration. Uploads are asynchronous: the POST returns an upload id that `uploadWorkout()` polls until an `activity_id` or `error` appears. `external_id` (`liftosaur-<record.id>`) is the idempotency key; Strava reports repeats as `"duplicate of activity <id>"`, which becomes a `StravaConflictError` carrying that id.
+
+### Strava exercise mapping (`src/exercise-map.ts`)
+
+Strava requires a FIT `exercise_type` enum per set (e.g. `BARBELL_BACK_SQUAT`). `resolveExerciseType(name, equipment)` tries an equipment-specific key, then the bare name, then keyword inference; unmapped exercises are dropped with a warning, since **an invalid `exercise_type` rejects the entire upload**.
+
+`src/strava-exercise-types.ts` is the 497-value list of accepted enums, extracted from the "Supported Exercises" section of https://developers.strava.com/docs/uploads/. `exercise-map.test.ts` asserts every mapped value appears in it — add new exercises to `EXERCISE_MAP`, not by guessing at enum names.
 
 ### State (`src/db.ts`)
 
@@ -63,5 +69,6 @@ SQLite via `better-sqlite3`. Three tables:
 
 - `parseSince(input)` — parses `--since` values: relative (`7d`, `2w`, `1m`) or ISO date passthrough
 - `toLocalDatetime(isoString, timezone?)` — strips timezone suffix; with `timezone` converts UTC→local via `Intl.DateTimeFormat`
-- `calculateKgLifted(exercisesText)` — sums work sets from Liftoscript format (lb→kg conversion, skips warmup/target lines and bodyweight)
+- `calculateKgLifted(exercisesText)` — sums work sets via `parseExercises` (lb→kg conversion; skips warmups, targets, and bodyweight/assisted sets)
+- `utcOffsetSeconds(isoString, timezone?)` — UTC offset in seconds at that instant, so DST is handled; required by Strava uploads
 - `formatSyncLabel(fullSync, since?)` — formats the sync mode for log output
