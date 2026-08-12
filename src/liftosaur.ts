@@ -77,18 +77,26 @@ export function parseExercises(exercisesText: string): LiftosaurExercise[] {
     const [name, equipment] = segments[0].split(",").map((s) => s.trim());
     if (!name) continue;
 
-    const sets: LiftosaurSet[] = [];
+    // Liftoscript lists warmups after the work sets, but they were performed
+    // first, so collect them separately and emit them in performed order.
+    const warmupSets: LiftosaurSet[] = [];
+    const workSets: LiftosaurSet[] = [];
+
     for (const segment of segments.slice(1)) {
       const s = segment.trim();
       if (s.startsWith("target:")) continue;
       if (s.startsWith("warmup:")) {
-        sets.push(...parseSetGroups(s.slice("warmup:".length), true));
+        warmupSets.push(...parseSetGroups(s.slice("warmup:".length), true));
       } else {
-        sets.push(...parseSetGroups(s, false));
+        workSets.push(...parseSetGroups(s, false));
       }
     }
 
-    exercises.push({ name, ...(equipment ? { equipment } : {}), sets });
+    exercises.push({
+      name,
+      ...(equipment ? { equipment } : {}),
+      sets: [...warmupSets, ...workSets],
+    });
   }
 
   return exercises;

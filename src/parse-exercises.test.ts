@@ -43,6 +43,18 @@ describe("parseExercises", () => {
     expect(r[0].sets.filter((s) => !s.isWarmup)).toHaveLength(3);
   });
 
+  it("orders warmup sets before work sets, regardless of text order", () => {
+    // Liftoscript lists warmups after the work sets, but they were performed first
+    const r = parseExercises("Deadlift / 3x8 175lb / warmup: 1x5 45lb, 1x5 85lb");
+    expect(r[0].sets.map((s) => [s.weight, s.isWarmup ?? false])).toEqual([
+      [45, true],
+      [85, true],
+      [175, false],
+      [175, false],
+      [175, false],
+    ]);
+  });
+
   it("ignores target segments", () => {
     const r = parseExercises("Seated Row / 3x8 140lb / target: 3x8-10 135lb 90s");
     expect(r[0].sets).toHaveLength(3);
