@@ -1,6 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { parseHistoryText } from "./liftosaur.js";
 
+describe("parseHistoryText exercises", () => {
+  it("populates structured exercises", () => {
+    const text = [
+      '2026-03-20T03:58:12Z / duration: 3600s / exercises: {',
+      "  Squat, Barbell / 3x5 185lb / warmup: 1x5 95lb",
+      "  Leg Press / 3x10 200lb",
+      "}",
+    ].join("\n");
+    const r = parseHistoryText(1774348292942, text);
+    expect(r.exercises.map((e) => e.name)).toEqual(["Squat", "Leg Press"]);
+    expect(r.exercises[0].equipment).toBe("Barbell");
+    expect(r.exercises[0].sets).toHaveLength(4);
+  });
+});
+
 describe("parseHistoryText", () => {
   const FULL_TEXT = [
     '2026-03-20T03:58:12Z / program: "5/3/1" / dayName: "Squat Day" / week: 2 / dayInWeek: 1 / duration: 3600s / exercises: {',

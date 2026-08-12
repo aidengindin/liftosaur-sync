@@ -28,6 +28,72 @@ export interface LiftosaurHistoryRecord {
 // Text format parser
 // ---------------------------------------------------------------------------
 
+/** Matches one set group: "3x8 175lb", "2x6|6 50lb", "1x12 -15lb", "1x10 42.5kg" */
+const SET_GROUP_RE = /^(\d+)x([\d|]+)\s+(-?\d+(?:\.\d+)?)(lb|kg)/;
+
+/**
+ * Parse one comma-separated list of set groups into individual sets.
+ * Bilateral reps ("6|6") expand to one set per side.
+ */
+function parseSetGroups(text: string, isWarmup: boolean): LiftosaurSet[] {
+  const sets: LiftosaurSet[] = [];
+
+  for (const group of text.split(",")) {
+    const m = SET_GROUP_RE.exec(group.trim());
+    if (!m) continue;
+
+    const count = parseInt(m[1], 10);
+    const perSide = m[2].split("|").map((n) => parseInt(n, 10));
+    const weight = parseFloat(m[3]);
+    const unit = m[4] as "lb" | "kg";
+
+    for (let i = 0; i < count; i++) {
+      for (const reps of perSide) {
+        sets.push({ reps, weight, unit, ...(isWarmup ? { isWarmup: true } : {}) });
+      }
+    }
+  }
+
+  return sets;
+}
+
+/**
+ * Parse a Liftoscript exercises block into structured exercises and sets.
+ *
+ * Each line looks like:
+ *   Name[, Equipment] / <work sets> [/ warmup: <sets>] [/ target: <prescription>]
+ *
+ * Warmup sets are included and flagged; target segments are prescriptions rather
+ * than performed work and are dropped. Lines beginning with "//" are comments.
+ */
+export function parseExercises(exercisesText: string): LiftosaurExercise[] {
+  const exercises: LiftosaurExercise[] = [];
+
+  for (const line of exercisesText.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("//")) continue;
+
+    const segments = trimmed.split(" / ");
+    const [name, equipment] = segments[0].split(",").map((s) => s.trim());
+    if (!name) continue;
+
+    const sets: LiftosaurSet[] = [];
+    for (const segment of segments.slice(1)) {
+      const s = segment.trim();
+      if (s.startsWith("target:")) continue;
+      if (s.startsWith("warmup:")) {
+        sets.push(...parseSetGroups(s.slice("warmup:".length), true));
+      } else {
+        sets.push(...parseSetGroups(s, false));
+      }
+    }
+
+    exercises.push({ name, ...(equipment ? { equipment } : {}), sets });
+  }
+
+  return exercises;
+}
+
 /**
  * Parse a Liftoscript Workouts text record into a structured LiftosaurHistoryRecord.
  * The text format looks like:
@@ -59,7 +125,7 @@ export function parseHistoryText(id: number, text: string): LiftosaurHistoryReco
     week: weekMatch ? parseInt(weekMatch[1], 10) : undefined,
     dayInWeek: dayInWeekMatch ? parseInt(dayInWeekMatch[1], 10) : undefined,
     duration: durationMatch ? parseInt(durationMatch[1], 10) : undefined,
-    exercises: [],
+    exercises: exercisesText ? parseExercises(exercisesText) : [],
     exercisesText: exercisesText || undefined,
   };
 }

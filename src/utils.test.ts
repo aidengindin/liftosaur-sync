@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { parseSince, toLocalDatetime, calculateKgLifted, calculateLoad } from "./utils.js";
+import { parseSince, toLocalDatetime, calculateKgLifted, calculateLoad, utcOffsetSeconds } from "./utils.js";
 
 describe("parseSince", () => {
   const FIXED_NOW = new Date("2026-03-25T12:00:00.000Z");
@@ -81,6 +81,39 @@ describe("calculateKgLifted", () => {
   it("handles kg units without conversion", () => {
     const result = calculateKgLifted("Squat / 3x5 100kg");
     expect(result).toBeCloseTo(3 * 5 * 100, 1);
+  });
+
+  it("counts every comma-separated set group, not just the first", () => {
+    const lbTotal = 1 * 4 * 170 + 1 * 5 * 170 + 1 * 4 * 170;
+    const result = calculateKgLifted("Squat / 1x4 170lb, 1x5 170lb, 1x4 170lb");
+    expect(result).toBeCloseTo(lbTotal * 0.453592, 0);
+  });
+
+  it("skips comment lines", () => {
+    const text = ["Squat / 1x5 100kg", "// Work: hooks 10, safeties 15"].join("\n");
+    expect(calculateKgLifted(text)).toBeCloseTo(500, 1);
+  });
+
+  it("skips assisted sets with negative weight", () => {
+    expect(calculateKgLifted("Pull Up, Leverage Machine / 3x8 -15lb")).toBe(0);
+  });
+});
+
+describe("utcOffsetSeconds", () => {
+  it("returns the daylight-saving offset for a summer date", () => {
+    expect(utcOffsetSeconds("2026-08-12T10:34:28Z", "America/New_York")).toBe(-4 * 3600);
+  });
+
+  it("returns the standard-time offset for a winter date", () => {
+    expect(utcOffsetSeconds("2026-01-15T10:34:28Z", "America/New_York")).toBe(-5 * 3600);
+  });
+
+  it("handles positive offsets", () => {
+    expect(utcOffsetSeconds("2026-08-12T10:34:28Z", "Europe/Berlin")).toBe(2 * 3600);
+  });
+
+  it("returns 0 for UTC", () => {
+    expect(utcOffsetSeconds("2026-08-12T10:34:28Z", "UTC")).toBe(0);
   });
 });
 
