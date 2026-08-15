@@ -40,7 +40,15 @@ const HISTORY_EXERCISES: Array<[string, string?]> = [
   ["Calf Press on Leg Press"],
   ["Seated Leg Curl"],
   ["Hip Abductor", "Cable"],
+  ["Preacher Curl", "Leverage Machine"],
 ];
+
+/** True when the exercise has its own entry rather than a keyword-inferred type. */
+function hasExplicitMapping(name: string, equipment?: string): boolean {
+  const key = name.trim().toLowerCase();
+  if (equipment && EXERCISE_MAP[`${key}|${equipment.trim().toLowerCase()}`]) return true;
+  return EXERCISE_MAP[key] !== undefined;
+}
 
 describe("EXERCISE_MAP", () => {
   it("only contains exercise types Strava accepts", () => {
@@ -57,6 +65,13 @@ describe("resolveExerciseType", () => {
       ([name, equipment]) => resolveExerciseType(name, equipment) === undefined
     );
     expect(unresolved).toEqual([]);
+  });
+
+  it("maps every exercise in the sync history explicitly, not by keyword inference", () => {
+    // Keyword inference is a safety net for novel exercises; anything actually
+    // performed deserves a specific type, or Strava shows a vague generic.
+    const inferred = HISTORY_EXERCISES.filter(([name, equipment]) => !hasExplicitMapping(name, equipment));
+    expect(inferred).toEqual([]);
   });
 
   it("prefers the equipment-specific mapping", () => {
